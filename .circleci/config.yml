@@ -16,6 +16,7 @@ jobs:
           command: |
             mkdir -p coverage
             go test -coverprofile=coverage/coverage.txt ./...
+            cat coverage/coverage.txt
       - codecov/upload:
           files: coverage/coverage.txt
 
