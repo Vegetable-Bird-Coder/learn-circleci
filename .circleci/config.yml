@@ -6,6 +6,15 @@ orbs:
   codecov: codecov/codecov@5
 
 jobs:
+  pick_base:
+    docker:
+      - image: cimg/go:1.24.1
+    steps:
+      - checkout
+      - codecov/upload:
+          run_command: pr-base-picking
+          verbose: true
+  
   go_test:
     docker:
       - image: cimg/go:1.24.1
@@ -17,22 +26,16 @@ jobs:
             mkdir -p coverage
             go test -coverprofile=coverage/coverage.txt ./...
             cat coverage/coverage.txt
-      - run:
-          name: Print CircleCI context
-          command: |
-            echo "SHA: $CIRCLE_SHA1"
-            echo "Branch: $CIRCLE_BRANCH"
-            echo "PR: $CIRCLE_PULL_REQUEST"
       - codecov/upload:
           files: coverage/coverage.txt
           verbose: true
           flags: unittests
-          sha: << pipeline.git.revision >>
-          branch: << pipeline.git.branch >>
-          pr: $PR_NUMBER
       
 
 workflows:
   setup:
     jobs:
-      - go_test
+      - pick_base
+      - go_test:
+          requires:
+            - pick_base
