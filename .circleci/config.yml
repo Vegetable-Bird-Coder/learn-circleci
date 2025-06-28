@@ -27,6 +27,7 @@ jobs:
           files: coverage/coverage.txt
           verbose: true
           flags: unittests
+          network_prefix: learn-circleci/
       
 
 workflows:
