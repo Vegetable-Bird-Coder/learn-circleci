@@ -3,13 +3,40 @@ version: 2.1
 setup: true
 
 orbs:
-  path-filtering: circleci/path-filtering@0.1.6
+  codecov: codecov/codecov@5
+
+jobs:
+  pick_base:
+    docker:
+      - image: cimg/go:1.24.1
+    steps:
+      - checkout
+      - codecov/upload:
+          run_command: pr-base-picking
+          verbose: true
+          git_service: github
+  
+  go_test:
+    docker:
+      - image: cimg/go:1.24.1
+    steps:
+      - checkout
+      - run:
+          name: Run Go tests with coverage
+          command: |
+            mkdir -p coverage
+            go test -coverprofile=coverage/coverage.txt ./...
+            cat coverage/coverage.txt
+      - codecov/upload:
+          files: coverage/coverage.txt
+          verbose: true
+          flags: unittests
+      
 
 workflows:
   setup:
     jobs:
-      - path-filtering/filter:
-          name: check-paths
-          mapping: .circleci/path-filtering/pipeline_parameters.txt
-          base-revision: main
-          config-path: .circleci/continue_config.yml
+      - pick_base
+      - go_test:
+          requires:
+            - pick_base
