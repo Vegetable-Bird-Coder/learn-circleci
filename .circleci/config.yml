@@ -5,7 +5,8 @@ setup: true
 orbs:
   codecov: codecov/codecov@5
 
-go_test:
+jobs:
+  go_test:
     docker:
       - image: cimg/go:1.24.1
     steps:
