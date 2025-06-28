@@ -1,0 +1,3 @@
+internal/.*\.go run_go_test true
+main\.go run_go_test true
+go\.mod run_go_test true

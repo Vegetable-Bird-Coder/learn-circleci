@@ -1,0 +1,22 @@
+version: 2.1
+
+parameters:
+  run_go_test:
+    type: boolean
+    default: false
+
+jobs:
+  go_test:
+    docker:
+      - image: cimg/go:1.24.1
+    steps:
+      - checkout
+      - run:
+          name: Run Go tests
+          command: go test ./...
+
+workflows:
+  test:
+    when: << pipeline.parameters.run_go_test >>
+    jobs:
+      - go_test
