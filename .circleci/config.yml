@@ -27,7 +27,9 @@ jobs:
           files: coverage/coverage.txt
           verbose: true
           flags: unittests
-          network_prefix: learn-circleci/
+          sha: << pipeline.git.revision >>
+          branch: << pipeline.git.branch >>
+          pr: $PR_NUMBER
       
 
 workflows:
