@@ -14,6 +14,7 @@ jobs:
       - codecov/upload:
           run_command: pr-base-picking
           verbose: true
+          git_service: github
   
   go_test:
     docker:
