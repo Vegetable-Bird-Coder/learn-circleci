@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  codecov: codecov/codecov@5
+
 parameters:
   run_go_test:
     type: boolean
@@ -12,8 +15,12 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Run Go tests
-          command: go test ./...
+          name: Run Go tests with coverage
+          command: |
+            mkdir -p coverage
+            go test -coverprofile=coverage/coverage.out ./...
+      - codecov/upload:
+          files: coverage/coverage.out
 
 workflows:
   test:
