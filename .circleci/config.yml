@@ -25,6 +25,8 @@ jobs:
             echo "PR: $CIRCLE_PULL_REQUEST"
       - codecov/upload:
           files: coverage/coverage.txt
+          verbose: true
+          flags: unittests
       
 
 workflows:
