@@ -17,8 +17,15 @@ jobs:
             mkdir -p coverage
             go test -coverprofile=coverage/coverage.txt ./...
             cat coverage/coverage.txt
+      - run:
+          name: Print CircleCI context
+          command: |
+            echo "SHA: $CIRCLE_SHA1"
+            echo "Branch: $CIRCLE_BRANCH"
+            echo "PR: $CIRCLE_PULL_REQUEST"
       - codecov/upload:
           files: coverage/coverage.txt
+      
 
 workflows:
   setup:
