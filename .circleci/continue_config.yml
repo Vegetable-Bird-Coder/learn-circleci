@@ -12,26 +12,9 @@ jobs:
   go_test:
     docker:
       # 替换为通用操作系统镜像
-      - image: cimg/base:stable
+      - image: cimg/go:1.24.1
     steps:
       - checkout
-      # **手动安装 Go 运行时**
-      - run:
-          name: Install Go runtime
-          command: |
-            # 根据你的需求选择 Go 版本，这里以 1.24.1 为例
-            GO_VERSION="1.24.1"
-            GO_ARCH="amd64" # 或者 arm64 if using aarch64 machine runner
-            GO_TAR="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
-            curl -LO https://go.dev/dl/${GO_TAR}
-            tar -C /usr/local -xzf ${GO_TAR}
-            rm ${GO_TAR}
-            echo 'export PATH=/usr/local/go/bin:$PATH' >> $BASH_ENV
-            echo 'export GOPATH=$HOME/go' >> $BASH_ENV # 设置 GOPATH
-            echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV # 将 GOPATH/bin 加入 PATH
-            source $BASH_ENV
-            go version # 验证 Go 安装
-            go env # 打印 Go 环境信息用于调试
 
       # ⚠️ 确保 add_ssh_keys 存在且配置正确
       - add_ssh_keys:
