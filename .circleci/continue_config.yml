@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  coveralls: coveralls/coveralls@2.2.5
+
 parameters:
   run_go_test:
     type: boolean
@@ -11,9 +14,20 @@ jobs:
       - image: cimg/go:1.24.1
     steps:
       - checkout
+      # 安装 go-acc 工具
       - run:
-          name: Run Go tests
-          command: go test ./...
+          name: Install go-acc
+          command: go install github.com/ory/go-acc@latest
+      # 运行 Go 测试并生成 LCOV 格式的覆盖率报告
+      - run:
+          name: Run Go tests and generate LCOV coverage
+          command: |
+            go-acc -o coverage.lcov ./...
+      # 上传覆盖率报告到 Coveralls
+      - coveralls/upload:
+          coverage_file: coverage.lcov # 指定 LCOV 格式的覆盖率文件
+          coverage_format: lcov        # 明确指定覆盖率文件格式为 lcov
+          compare_ref: main            # 将当前 PR 的覆盖率与 main 分支进行比较
 
 workflows:
   test:
