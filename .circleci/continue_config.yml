@@ -21,7 +21,6 @@ jobs:
           fingerprints:
             - "SHA256:LzoU0FR46y2axEXYuQfKVht59JkaVYyvB4YZOcWdHpo" # 再次确认你的密钥指纹
 
-      # Setup Go Environment and Force SSH for Git
       - run:
           name: Setup Go Environment and Force SSH for Git
           command: |
@@ -33,47 +32,42 @@ jobs:
             go env
             echo "GIT_SSH_COMMAND: $GIT_SSH_COMMAND"
 
-      # --- Install go-acc tool ---
-      # This step is now working correctly, downloading via SSH.
       - run:
-          name: Install go-acc
+          name: Install go-acc and gocov2lcov
           command: |
             go install github.com/ory/go-acc@latest
+            go install github.com/jandelgado/gocov2lcov@latest
             which go-acc || { echo "go-acc not found in PATH!"; exit 1; }
-            # REMOVED: go-acc --version (as it's not supported by this go-acc version)
-            echo "go-acc installed successfully!"
-      # --- Install go-acc tool end ---
+            which gocov2lcov || { echo "gocov2lcov not found in PATH!"; exit 1; }
+            echo "Tools installed successfully."
 
-      # Run Go tests and generate LCOV format coverage (using go-acc)
       - run:
-          name: Run Go tests and generate LCOV coverage
+          name: Run Go tests and generate raw Go coverage
           command: |
-            rm -f coverage.lcov # Clean up old LCOV file
-            # This command is correct for generating coverage with go-acc
-            go-acc -o coverage.lcov ./...
-            if [ ! -s coverage.lcov ]; then
-              echo "ERROR: coverage.lcov was not generated or is empty!"
+            rm -f coverage.out
+            go-acc -o coverage.out ./...
+            if [ ! -s coverage.out ]; then
+              echo "ERROR: coverage.out was not generated or is empty!"
               exit 1
             fi
 
-      # Debugging steps: Verify final coverage.lcov content (keep until successful)
       - run:
-          name: Verify final coverage.lcov content
+          name: Convert Go coverage.out to LCOV format
+          command: |
+            gocov2lcov -in coverage.out -out coverage.lcov
+            if [ ! -s coverage.lcov ]; then
+              echo "ERROR: coverage.lcov is empty after conversion!"
+              exit 1
+            fi
+
+      - run:
+          name: Verify final LCOV coverage.lcov content
           command: |
             echo "--- Contents of final coverage.lcov ---"
-            cat coverage.lcov || echo "ERROR: coverage.lcov is missing!"
+            head -n 20 coverage.lcov || echo "ERROR: coverage.lcov is missing!"
             echo "---------------------------------------"
-            # Explicitly check for LCOV flags
-            if ! grep -q "SF:" coverage.lcov; then
-              echo "WARNING: coverage.lcov does not appear to be valid LCOV format (missing SF: lines)."
-              exit 1
-            fi
-            if grep -q "mode: atomic" coverage.lcov; then
-              echo "WARNING: coverage.lcov still contains raw Go coverprofile format!"
-              exit 1
-            fi
+            grep -q "SF:" coverage.lcov || { echo "ERROR: Not valid LCOV format (missing SF:)"; exit 1; }
 
-      # Upload coverage report to Coveralls
       - coveralls/upload:
           coverage_file: coverage.lcov
           coverage_format: lcov
