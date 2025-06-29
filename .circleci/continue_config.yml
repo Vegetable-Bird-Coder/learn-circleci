@@ -14,16 +14,18 @@ jobs:
       - image: cimg/go:1.24.1
     steps:
       - checkout
-      # 安装 go-acc 工具
       - run:
           name: Install go-acc
           command: go install github.com/ory/go-acc@latest
-      # 运行 Go 测试并生成 LCOV 格式的覆盖率报告
       - run:
           name: Run Go tests and generate LCOV coverage
           command: |
             go-acc -o coverage.lcov ./...
-      # 上传覆盖率报告到 Coveralls
+      - run: # Add this step to debug
+          name: Check for coverage.lcov
+          command: |
+            ls -la ./
+            cat coverage.lcov || true # Try to print content, '|| true' prevents failure if file is empty
       - coveralls/upload:
           coverage_file: coverage.lcov # 指定 LCOV 格式的覆盖率文件
           coverage_format: lcov        # 明确指定覆盖率文件格式为 lcov
