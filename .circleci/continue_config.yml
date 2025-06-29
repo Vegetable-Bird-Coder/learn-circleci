@@ -15,46 +15,68 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Set GOPATH and add to PATH
+          name: Setup Go Environment
           command: |
             echo 'export GOPATH=$HOME/go' >> $BASH_ENV
             echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV
             source $BASH_ENV
-            go env # Verify environment variables are set
+            go env # 打印 Go 环境信息用于调试
 
-      # Install go-acc tool
+      # 步骤 1: 运行 Go 测试并生成原始的 coverage.out 文件
       - run:
-          name: Install go-acc
-          command: go install github.com/ory/go-acc@latest
-
-      # Run Go tests and generate LCOV format coverage
-      # Ensure you run this from the root of your Go module.
-      # If your module is in a subdirectory, adjust './...' accordingly.
-      - run:
-          name: Run Go tests and generate LCOV coverage
+          name: Run Go tests and generate raw coverage.out
           command: |
-            # Remove any previous coverage files to ensure clean generation
-            rm -f coverage.lcov
-            # Run go-acc. This command internally runs 'go test -coverprofile' and converts.
-            # The output of your 'cat' command indicates 'go-acc' might not be generating LCOV.
-            # Make sure your go.mod is in the root of the project ($PWD) for './...' to work.
-            go-acc -o coverage.lcov ./...
+            rm -f coverage.out # 清理旧文件
+            go test -v -coverprofile=coverage.out ./... # 生成原始 Go 覆盖率文件
+            # 检查文件是否存在且非空
+            if [ ! -s coverage.out ]; then
+              echo "ERROR: coverage.out was not generated or is empty!"
+              exit 1
+            fi
 
-      # Debugging steps (KEEP THESE for verification)
+      # 步骤 2: 安装 go-lcov 工具
       - run:
-          name: Check for coverage.lcov and its content
+          name: Install go-lcov
           command: |
-            echo "Listing files in current directory:"
-            ls -la ./
-            echo "Contents of coverage.lcov:"
-            cat coverage.lcov || echo "coverage.lcov is empty or not found."
+            go install github.com/jstemmer/go-lcov@latest
+            which go-lcov || { echo "go-lcov not found in PATH!"; exit 1; }
+            go-lcov --version || { echo "go-lcov failed to run!"; exit 1; } # 检查安装
 
-      # Upload coverage report to Coveralls
+      # 步骤 3: 使用 go-lcov 将 coverage.out 转换为 LCOV 格式
+      - run:
+          name: Convert coverage.out to LCOV
+          command: |
+            rm -f coverage.lcov # 清理旧 LCOV 文件
+            go-lcov -v coverage.out > coverage.lcov # 将 .out 转换为 .lcov
+            # 检查转换后的 LCOV 文件
+            if [ ! -s coverage.lcov ]; then
+              echo "ERROR: coverage.lcov was not generated or is empty after conversion!"
+              exit 1
+            fi
+
+      # 调试步骤：验证最终的 coverage.lcov 内容 (保留直到成功)
+      - run:
+          name: Verify final coverage.lcov content
+          command: |
+            echo "--- Contents of final coverage.lcov ---"
+            cat coverage.lcov || echo "ERROR: coverage.lcov is missing!"
+            echo "---------------------------------------"
+            # 明确检查 LCOV 标志
+            if ! grep -q "SF:" coverage.lcov; then
+              echo "WARNING: coverage.lcov does not appear to be valid LCOV format (missing SF: lines)."
+              exit 1
+            fi
+            if grep -q "mode: atomic" coverage.lcov; then
+              echo "WARNING: coverage.lcov still contains raw Go coverprofile format!"
+              exit 1
+            fi
+
+      # 上传覆盖率报告到 Coveralls
       - coveralls/upload:
-          coverage_file: coverage.lcov # Specify the LCOV format coverage file
-          coverage_format: lcov        # Explicitly specify coverage file format as lcov
-          compare_ref: main            # Compare current PR coverage with main branch
-          debug: true # Enable debug mode for more detailed output
+          coverage_file: coverage.lcov # 指定 LCOV 格式的覆盖率文件
+          coverage_format: lcov        # 明确指定 LCOV 格式
+          compare_ref: main            # 将当前 PR 的覆盖率与 main 分支进行比较
+          debug: true # 启用调试模式以获取更详细的输出
 
 workflows:
   test:
