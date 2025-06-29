@@ -16,57 +16,39 @@ jobs:
     steps:
       - checkout
 
-      # ⚠️ 确保 add_ssh_keys 存在且配置正确
-      - add_ssh_keys:
-          fingerprints:
-            - "SHA256:LzoU0FR46y2axEXYuQfKVht59JkaVYyvB4YZOcWdHpo" # 再次确认你的密钥指纹
-
       - run:
-          name: Setup Go Environment and Force SSH for Git
+          name: Setup Go environment
           command: |
             echo 'export GOPATH=$HOME/go' >> $BASH_ENV
             echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV
-            echo 'export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"' >> $BASH_ENV
-            git config --global url."git@github.com:".insteadOf "https://github.com/"
             source $BASH_ENV
             go env
-            echo "GIT_SSH_COMMAND: $GIT_SSH_COMMAND"
 
       - run:
-          name: Install go-acc and gocov2lcov
+          name: Install gcov2lcov
           command: |
-            go install github.com/ory/go-acc@latest
-            go install github.com/jandelgado/gocov2lcov@latest
-            which go-acc || { echo "go-acc not found in PATH!"; exit 1; }
-            which gocov2lcov || { echo "gocov2lcov not found in PATH!"; exit 1; }
-            echo "Tools installed successfully."
+            go install github.com/jandelgado/gcov2lcov@latest
+            which gcov2lcov || { echo "gcov2lcov not installed!"; exit 1; }
 
       - run:
-          name: Run Go tests and generate raw Go coverage
+          name: Run Go tests and generate coverage.out
           command: |
-            rm -f coverage.out
-            go-acc -o coverage.out ./...
+            go test -coverprofile=coverage.out ./...
             if [ ! -s coverage.out ]; then
-              echo "ERROR: coverage.out was not generated or is empty!"
+              echo "ERROR: coverage.out not generated or empty!"
               exit 1
             fi
 
       - run:
           name: Convert Go coverage.out to LCOV format
           command: |
-            gocov2lcov -in coverage.out -out coverage.lcov
+            GOROOT=$(go env GOROOT) gcov2lcov -infile=coverage.out -outfile=coverage.lcov
             if [ ! -s coverage.lcov ]; then
-              echo "ERROR: coverage.lcov is empty after conversion!"
+              echo "ERROR: coverage.lcov not created!"
               exit 1
             fi
-
-      - run:
-          name: Verify final LCOV coverage.lcov content
-          command: |
-            echo "--- Contents of final coverage.lcov ---"
-            head -n 20 coverage.lcov || echo "ERROR: coverage.lcov is missing!"
-            echo "---------------------------------------"
-            grep -q "SF:" coverage.lcov || { echo "ERROR: Not valid LCOV format (missing SF:)"; exit 1; }
+            echo "✅ LCOV file created:"
+            head -n 20 coverage.lcov
 
       - coveralls/upload:
           coverage_file: coverage.lcov
