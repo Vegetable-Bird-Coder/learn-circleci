@@ -10,7 +10,8 @@ func Int2Str(i int) string {
 
 	var result string
 	for i > 0 {
-		result = string('0'+i%10) + result
+		digit := byte('0' + i%10)
+		result = string(digit) + result
 		i /= 10
 	}
 	return result
