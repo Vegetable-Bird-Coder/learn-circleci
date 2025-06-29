@@ -21,51 +21,49 @@ jobs:
           fingerprints:
             - "SHA256:LzoU0FR46y2axEXYuQfKVht59JkaVYyvB4YZOcWdHpo" # 再次确认你的密钥指纹
 
-      # 设置 Go 环境和 Git SSH 命令，强制通过 SSH 下载模块
+      # Setup Go Environment and Force SSH for Git
       - run:
           name: Setup Go Environment and Force SSH for Git
           command: |
             echo 'export GOPATH=$HOME/go' >> $BASH_ENV
             echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV
-            # 强制 Go Modules 使用 SSH 访问 GitHub，并且不进行主机密钥检查
-            # 这行是核心，确保通过SSH而不是HTTPS来拉取Go模块
             echo 'export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"' >> $BASH_ENV
-            # 配置 git 将 https://github.com 的请求重定向到 git@github.com:，进一步确保使用 SSH
             git config --global url."git@github.com:".insteadOf "https://github.com/"
             source $BASH_ENV
-            go env # 打印 Go 环境信息用于调试
-            echo "GIT_SSH_COMMAND: $GIT_SSH_COMMAND" # 验证环境变量
+            go env
+            echo "GIT_SSH_COMMAND: $GIT_SSH_COMMAND"
 
-      # --- 安装 go-acc 工具 ---
-      # 现在，go install 应该能够通过 SSH 协议成功拉取 go-acc
+      # --- Install go-acc tool ---
+      # This step is now working correctly, downloading via SSH.
       - run:
           name: Install go-acc
           command: |
-            go install github.com/ory/go-acc@latest # 使用 go install 直接拉取
+            go install github.com/ory/go-acc@latest
             which go-acc || { echo "go-acc not found in PATH!"; exit 1; }
-            go-acc --version || { echo "go-acc failed to run!"; exit 1; }
+            # REMOVED: go-acc --version (as it's not supported by this go-acc version)
             echo "go-acc installed successfully!"
-      # --- 安装 go-acc 工具结束 ---
+      # --- Install go-acc tool end ---
 
-      # 运行 Go 测试并生成 LCOV 格式的覆盖率报告 (使用 go-acc)
+      # Run Go tests and generate LCOV format coverage (using go-acc)
       - run:
           name: Run Go tests and generate LCOV coverage
           command: |
-            rm -f coverage.lcov # 清理旧 LCOV 文件
-            go-acc -o coverage.lcov ./... # 使用 go-acc 运行测试并直接输出 LCOV
+            rm -f coverage.lcov # Clean up old LCOV file
+            # This command is correct for generating coverage with go-acc
+            go-acc -o coverage.lcov ./...
             if [ ! -s coverage.lcov ]; then
               echo "ERROR: coverage.lcov was not generated or is empty!"
               exit 1
             fi
 
-      # 调试步骤：验证最终的 coverage.lcov 内容 (保留直到成功)
+      # Debugging steps: Verify final coverage.lcov content (keep until successful)
       - run:
           name: Verify final coverage.lcov content
           command: |
             echo "--- Contents of final coverage.lcov ---"
             cat coverage.lcov || echo "ERROR: coverage.lcov is missing!"
             echo "---------------------------------------"
-            # 明确检查 LCOV 标志
+            # Explicitly check for LCOV flags
             if ! grep -q "SF:" coverage.lcov; then
               echo "WARNING: coverage.lcov does not appear to be valid LCOV format (missing SF: lines)."
               exit 1
@@ -75,11 +73,11 @@ jobs:
               exit 1
             fi
 
-      # 上传覆盖率报告到 Coveralls
+      # Upload coverage report to Coveralls
       - coveralls/upload:
-          coverage_file: coverage.lcov # 指定 LCOV 格式的覆盖率文件
-          coverage_format: lcov        # 明确指定 LCOV 格式
-          compare_ref: main            # 将当前 PR 的覆盖率与 main 分支进行比较
+          coverage_file: coverage.lcov
+          coverage_format: lcov
+          compare_ref: main
 
 workflows:
   test:
