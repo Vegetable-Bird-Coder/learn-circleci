@@ -54,6 +54,7 @@ jobs:
           coverage_file: coverage.lcov # Specify the LCOV format coverage file
           coverage_format: lcov        # Explicitly specify coverage file format as lcov
           compare_ref: main            # Compare current PR coverage with main branch
+          debug: true # Enable debug mode for more detailed output
 
 workflows:
   test:
