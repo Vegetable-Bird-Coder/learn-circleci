@@ -11,20 +11,46 @@ parameters:
 jobs:
   go_test:
     docker:
-      - image: cimg/go:1.24.1
+      # 替换为通用操作系统镜像
+      - image: cimg/base:stable
     steps:
       - checkout
-      # 确保 GOPATH/bin 在 PATH 中
+      # **手动安装 Go 运行时**
       - run:
-          name: Setup Go Environment
+          name: Install Go runtime
           command: |
-            echo 'export GOPATH=$HOME/go' >> $BASH_ENV
-            echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV
+            # 根据你的需求选择 Go 版本，这里以 1.24.1 为例
+            GO_VERSION="1.24.1"
+            GO_ARCH="amd64" # 或者 arm64 if using aarch64 machine runner
+            GO_TAR="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
+            curl -LO https://go.dev/dl/${GO_TAR}
+            tar -C /usr/local -xzf ${GO_TAR}
+            rm ${GO_TAR}
+            echo 'export PATH=/usr/local/go/bin:$PATH' >> $BASH_ENV
+            echo 'export GOPATH=$HOME/go' >> $BASH_ENV # 设置 GOPATH
+            echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV # 将 GOPATH/bin 加入 PATH
             source $BASH_ENV
+            go version # 验证 Go 安装
             go env # 打印 Go 环境信息用于调试
 
+      # ⚠️ 确保 add_ssh_keys 存在且配置正确
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:LzoU0FR46y2axEXYuQfKVht59JkaVYyvB4YZOcWdHpo" # 再次确认你的密钥指纹
+
+      # 强制 Go Modules 使用 SSH 访问 GitHub，并且不要提示确认
+      - run:
+          name: Configure Git for SSH
+          command: |
+            # 这是最关键的部分，确保 Git 使用 SSH
+            git config --global url."git@github.com:".insteadOf "https://github.com/"
+            echo 'export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"' >> $BASH_ENV
+            source $BASH_ENV
+            echo "GIT_SSH_COMMAND: $GIT_SSH_COMMAND" # 验证环境变量
+
+      # --- 以下步骤与之前相同，因为 Go 环境和 Git 已手动设置 ---
+
       # 步骤 1: 安装 gocov 工具
-      # 同样，如果遇到 git 认证问题，可以尝试手动下载源码包并go install
       - run:
           name: Install gocov
           command: |
@@ -38,36 +64,33 @@ jobs:
             go install github.com/urakumo/gocov-lcov@latest
             which gocov-lcov || { echo "gocov-lcov not found in PATH!"; exit 1; }
 
-      # 步骤 3: 运行 Go 测试并使用 gocov 生成 JSON 格式的覆盖率报告
+      # ... (后续的 Go 测试、LCOV 转换和 Coveralls 上传步骤不变) ...
       - run:
           name: Run Go tests and generate JSON coverage
           command: |
             rm -f coverage.json
-            gocov test ./... > coverage.json # 使用 gocov 运行测试并输出 JSON
+            gocov test ./... > coverage.json
             if [ ! -s coverage.json ]; then
               echo "ERROR: coverage.json was not generated or is empty!"
               exit 1
             fi
 
-      # 步骤 4: 使用 gocov-lcov 将 JSON 格式转换为 LCOV 格式
       - run:
           name: Convert JSON coverage to LCOV
           command: |
             rm -f coverage.lcov
-            cat coverage.json | gocov-lcov > coverage.lcov # 将 JSON 转换为 LCOV
+            cat coverage.json | gocov-lcov > coverage.lcov
             if [ ! -s coverage.lcov ]; then
               echo "ERROR: coverage.lcov was not generated or is empty after conversion!"
               exit 1
             fi
 
-      # 调试步骤：验证最终的 coverage.lcov 内容 (保留直到成功)
       - run:
           name: Verify final coverage.lcov content
           command: |
             echo "--- Contents of final coverage.lcov ---"
             cat coverage.lcov || echo "ERROR: coverage.lcov is missing!"
             echo "---------------------------------------"
-            # 明确检查 LCOV 标志
             if ! grep -q "SF:" coverage.lcov; then
               echo "WARNING: coverage.lcov does not appear to be valid LCOV format (missing SF: lines)."
               exit 1
@@ -77,11 +100,10 @@ jobs:
               exit 1
             fi
 
-      # 上传覆盖率报告到 Coveralls
       - coveralls/upload:
-          coverage_file: coverage.lcov # 指定 LCOV 格式的覆盖率文件
-          coverage_format: lcov        # 明确指定 LCOV 格式
-          compare_ref: main            # 将当前 PR 的覆盖率与 main 分支进行比较
+          coverage_file: coverage.lcov
+          coverage_format: lcov
+          compare_ref: main
 
 workflows:
   test:
