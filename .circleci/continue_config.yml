@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  coveralls: coveralls/coveralls@2.2.5
+
 parameters:
   run_go_test:
     type: boolean
@@ -8,12 +11,49 @@ parameters:
 jobs:
   go_test:
     docker:
+      # 替换为通用操作系统镜像
       - image: cimg/go:1.24.1
     steps:
       - checkout
+
       - run:
-          name: Run Go tests
-          command: go test ./...
+          name: Setup Go environment
+          command: |
+            echo 'export GOPATH=$HOME/go' >> $BASH_ENV
+            echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV
+            source $BASH_ENV
+            go env
+
+      - run:
+          name: Install gcov2lcov
+          command: |
+            go install github.com/jandelgado/gcov2lcov@latest
+            which gcov2lcov || { echo "gcov2lcov not installed!"; exit 1; }
+
+      - run:
+          name: Run Go tests and generate coverage.out
+          command: |
+            go test -coverprofile=coverage.out ./...
+            if [ ! -s coverage.out ]; then
+              echo "ERROR: coverage.out not generated or empty!"
+              exit 1
+            fi
+
+      - run:
+          name: Convert Go coverage.out to LCOV format
+          command: |
+            GOROOT=$(go env GOROOT) gcov2lcov -infile=coverage.out -outfile=coverage.lcov
+            if [ ! -s coverage.lcov ]; then
+              echo "ERROR: coverage.lcov not created!"
+              exit 1
+            fi
+            echo "✅ LCOV file created:"
+            head -n 20 coverage.lcov
+
+      - coveralls/upload:
+          coverage_file: coverage.lcov
+          coverage_format: lcov
+          compare_ref: main
 
 workflows:
   test:

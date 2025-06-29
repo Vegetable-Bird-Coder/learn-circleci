@@ -3,13 +3,13 @@ version: 2.1
 setup: true
 
 orbs:
-  path-filtering: circleci/path-filtering@0.1.6
+  path-filtering: circleci/path-filtering@2.0.1
 
 workflows:
   setup:
     jobs:
       - path-filtering/filter:
           name: check-paths
-          mapping: .circleci/path-filtering/pipeline_parameters.txt
+          mapping: .circleci/path-filtering/pipeline_parameters.conf
           base-revision: main
           config-path: .circleci/continue_config.yml
