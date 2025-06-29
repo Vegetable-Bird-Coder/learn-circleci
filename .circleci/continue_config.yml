@@ -21,59 +21,66 @@ jobs:
           fingerprints:
             - "SHA256:LzoU0FR46y2axEXYuQfKVht59JkaVYyvB4YZOcWdHpo" # 再次确认你的密钥指纹
 
-      # 强制 Go Modules 使用 SSH 访问 GitHub，并且不要提示确认
+      # 设置 Go 环境和 Git SSH 命令，强制通过 SSH 下载模块
       - run:
-          name: Configure Git for SSH
+          name: Setup Go Environment and Force SSH for Git
           command: |
-            # 这是最关键的部分，确保 Git 使用 SSH
-            git config --global url."git@github.com:".insteadOf "https://github.com/"
+            echo 'export GOPATH=$HOME/go' >> $BASH_ENV
+            echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV
+            # 强制 Go Modules 使用 SSH 访问 GitHub，并且不要提示确认
             echo 'export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"' >> $BASH_ENV
+            # 配置 git 使用 ssh 而不是 https
+            git config --global url."git@github.com:".insteadOf "https://github.com/"
             source $BASH_ENV
+            go env # 打印 Go 环境信息用于调试
             echo "GIT_SSH_COMMAND: $GIT_SSH_COMMAND" # 验证环境变量
 
-      # --- 以下步骤与之前相同，因为 Go 环境和 Git 已手动设置 ---
-
-      # 步骤 1: 安装 gocov 工具
+      # 步骤 1: 安装 gocov 工具 - 修正模块路径
       - run:
           name: Install gocov
           command: |
-            go install github.com/timakin/gocov/cmd/gocov@latest
+            # 修正为模块的根路径: github.com/timakin/gocov
+            go install github.com/timakin/gocov@latest
             which gocov || { echo "gocov not found in PATH!"; exit 1; }
 
-      # 步骤 2: 安装 gocov-lcov 工具
+      # 步骤 2: 安装 gocov-lcov 工具 - 路径应该是正确的
       - run:
           name: Install gocov-lcov
           command: |
             go install github.com/urakumo/gocov-lcov@latest
             which gocov-lcov || { echo "gocov-lcov not found in PATH!"; exit 1; }
 
-      # ... (后续的 Go 测试、LCOV 转换和 Coveralls 上传步骤不变) ...
+      # 步骤 3: 运行 Go 测试并使用 gocov 生成 JSON 格式的覆盖率报告
       - run:
           name: Run Go tests and generate JSON coverage
           command: |
             rm -f coverage.json
-            gocov test ./... > coverage.json
+            # 注意：如果你的 Go 模块在子目录，gocov test ./... 可能需要调整
+            gocov test ./... > coverage.json # 使用 gocov 运行测试并输出 JSON
             if [ ! -s coverage.json ]; then
               echo "ERROR: coverage.json was not generated or is empty!"
               exit 1
             fi
 
+      # 步骤 4: 使用 gocov-lcov 将 JSON 格式转换为 LCOV 格式
       - run:
           name: Convert JSON coverage to LCOV
           command: |
             rm -f coverage.lcov
-            cat coverage.json | gocov-lcov > coverage.lcov
+            cat coverage.json | gocov-lcov > coverage.lcov # 将 JSON 转换为 LCOV
             if [ ! -s coverage.lcov ]; then
               echo "ERROR: coverage.lcov was not generated or is empty after conversion!"
               exit 1
             fi
 
+      # 调试步骤：验证最终的 coverage.lcov 内容 (保留直到成功)
       - run:
           name: Verify final coverage.lcov content
           command: |
             echo "--- Contents of final coverage.lcov ---"
             cat coverage.lcov || echo "ERROR: coverage.lcov is missing!"
             echo "---------------------------------------"
+            # 明确检查 LCOV 标志
             if ! grep -q "SF:" coverage.lcov; then
               echo "WARNING: coverage.lcov does not appear to be valid LCOV format (missing SF: lines)."
               exit 1
@@ -83,10 +90,11 @@ jobs:
               exit 1
             fi
 
+      # 上传覆盖率报告到 Coveralls
       - coveralls/upload:
-          coverage_file: coverage.lcov
-          coverage_format: lcov
-          compare_ref: main
+          coverage_file: coverage.lcov # 指定 LCOV 格式的覆盖率文件
+          coverage_format: lcov        # 明确指定 LCOV 格式
+          compare_ref: main            # 将当前 PR 的覆盖率与 main 分支进行比较
 
 workflows:
   test:
