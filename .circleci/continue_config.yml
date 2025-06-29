@@ -15,21 +15,45 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Set GOPATH and add to PATH
+          command: |
+            echo 'export GOPATH=$HOME/go' >> $BASH_ENV
+            echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV
+            source $BASH_ENV
+            go env # Verify environment variables are set
+
+      # Install go-acc tool
+      - run:
           name: Install go-acc
           command: go install github.com/ory/go-acc@latest
+
+      # Run Go tests and generate LCOV format coverage
+      # Ensure you run this from the root of your Go module.
+      # If your module is in a subdirectory, adjust './...' accordingly.
       - run:
           name: Run Go tests and generate LCOV coverage
           command: |
+            # Remove any previous coverage files to ensure clean generation
+            rm -f coverage.lcov
+            # Run go-acc. This command internally runs 'go test -coverprofile' and converts.
+            # The output of your 'cat' command indicates 'go-acc' might not be generating LCOV.
+            # Make sure your go.mod is in the root of the project ($PWD) for './...' to work.
             go-acc -o coverage.lcov ./...
-      - run: # Add this step to debug
-          name: Check for coverage.lcov
+
+      # Debugging steps (KEEP THESE for verification)
+      - run:
+          name: Check for coverage.lcov and its content
           command: |
+            echo "Listing files in current directory:"
             ls -la ./
-            cat coverage.lcov || true # Try to print content, '|| true' prevents failure if file is empty
+            echo "Contents of coverage.lcov:"
+            cat coverage.lcov || echo "coverage.lcov is empty or not found."
+
+      # Upload coverage report to Coveralls
       - coveralls/upload:
-          coverage_file: coverage.lcov # 指定 LCOV 格式的覆盖率文件
-          coverage_format: lcov        # 明确指定覆盖率文件格式为 lcov
-          compare_ref: main            # 将当前 PR 的覆盖率与 main 分支进行比较
+          coverage_file: coverage.lcov # Specify the LCOV format coverage file
+          coverage_format: lcov        # Explicitly specify coverage file format as lcov
+          compare_ref: main            # Compare current PR coverage with main branch
 
 workflows:
   test:
